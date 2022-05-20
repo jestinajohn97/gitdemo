@@ -1,0 +1,155 @@
+create database airline_delay DB;
+use airline_delay DB;
+
+--Create external table “flights” using Database “airline_delayDB”
+DROP TABLE IF EXISTS flights;
+
+create external table if not exists flights(ID INT, YEAR INT, MONTH INT, DAY INT, DAY_OF_WEE INT, AIRLINE VARCHAR(10),
+FLIGHT_NUMBER INT, TAIL_NUMBER VARCHAR(20),
+ORIGIN_AIRPORT VARCHAR(20), DESTINATION_AIRPORT VARCHAR(20), SCHEDULED_DEPARTURE INT, DEPARTURE_TIME INT,
+DEPARTURE_DELAY INT, TAXI_OUT INT, WHEELS_OFF INT, SCHEDULED_TIME INT,
+ELAPSED_TIME INT, AIR_TIME INT, DISTANCE INT, WHEELS_ON INT, TAXI_IN INT, SCHEDULED_ARRIVAL INT, ARRIVAL_TIME INT, ARRIVAL_DELAY INT, DIVERTED INT,
+CANCELLED INT, CANCELLATION_REASON INT, AIR_SYSTEM_DELAY INT, SECURITY_DELAY INT, AIRLINE_DELAY INT,
+LATE_AIRCRAFT_DELAY INT, WEATHER_DELAY INT)
+
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY ','
+LINES TERMINATED BY '\n'
+STORED AS TEXTFILE
+LOCATION '/flights';
+
+select * from flights limit 6;
+
+--Create a parquet table “parquet_flights” & insert the data into this using “flights” external 
+DROP TABLE IF EXISTS parquet_flight_delay;
+
+create external table if not exists parquet_flights(ID INT, YEAR INT, MONTH INT, DAY INT, DAY_OF_WEE INT, AIRLINE VARCHAR(10),
+FLIGHT_NUMBER INT, TAIL_NUMBER VARCHAR(20),
+ORIGIN_AIRPORT VARCHAR(20), DESTINATION_AIRPORT VARCHAR(20), SCHEDULED_DEPARTURE INT, DEPARTURE_TIME INT,
+DEPARTURE_DELAY INT, TAXI_OUT INT, WHEELS_OFF INT, SCHEDULED_TIME INT,
+ELAPSED_TIME INT, AIR_TIME INT, DISTANCE INT, WHEELS_ON INT, TAXI_IN INT, SCHEDULED_ARRIVAL INT, ARRIVAL_TIME INT, ARRIVAL_DELAY INT, DIVERTED INT,
+CANCELLED INT, CANCELLATION_REASON INT, AIR_SYSTEM_DELAY INT, SECURITY_DELAY INT, AIRLINE_DELAY INT,
+LATE_AIRCRAFT_DELAY INT, WEATHER_DELAY INT)
+
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY ','
+LINES TERMINATED BY '\n'
+STORED AS parquetfile;
+
+insert into table parquet_flights
+select * from flights;
+
+--2.display first 6 rows of records
+select * from parquet_flight_delay limit 6;
+
+
+--d.Average arrival delay caused by airlines
+--select AIRLINE,avg(ARRIVAL_DELAY) as avg_delay from parquet_flights group by AIRLINE order by avg_delay;
+
+--e.Days of months with respected to average of arrival delays
+--select MONTH, avg(ARRIVAL_DELAY) as AVG_DELAY from parquet_flights group by MONTH order by MONTH;
+
+--f.Arrange weekdays with respect to the average arrival delays caused
+
+
+--g.Arrange Days of month as per cancellations done in Descending
+--select MONTH, count(CANCELLED) as AVG_DELAY from parquet_flights group by MONTH order by MONTH;
+
+--h.Finding busiest airports with respect to day of week
+--select DAY_OF_WEEK, ORIGIN_AIRPORT, DESTINATION_AIRPORT, count(ORIGIN_AIRPORT) as origin, count(DESTINATION_AIRPORT) as destination from parquet_flights 
+group by DAY_OF_WEEK, ORIGIN_AIRPORT, DESTINATION_AIRPORT order by DAY_OF_WEEK desc;
+
+--i.Finding airlines that make the maximum number of cancellations
+--select AIRLINE, count(CANCELLED) as AVG_DELAY from parquet_flights group by AIRLINE order by AIRLINE desc;
+
+--j.Find and order airlines in descending that make the most number of diversions
+select AIRLINE, sum(DIVERTED) as diverted from parquet_flights group by AIRLINE order by diverted desc;
+
+--k.Finding days of month that see the most number of diversion
+--select MONTH, sum(DIVERTED) as div from parquet_flights group by MONTH order by MONTH;
+
+--l.Calculating mean and standard deviation of departure delay for all flights in minutes
+--select AIRLINE, avg(DEPARTURE_DELAY) as mean, stddev(DEPARTURE_DELAY) as standard from parquet_flights group by AIRLINE,mean, standard order by AIRLINE desc;
+
+--m.Calculating mean and standard deviation of arrival delay for all flights in minutes
+--select AIRLINE, avg(ARRIVAL_DELAY) as mean, stddev(ARRIVAL_DELAY) as standard from parquet_flights group by AIRLINE,mean, standard order by AIRLINE desc;
+
+--n.Create a partitioning table “flights_partition” using partitioned by schema “CANCELLED”
+
+use hivedb;
+
+DROP table if exists flights_part;
+
+CREATE EXTERNAL TABLE IF NOT EXISTS flights_data(ID int, YEAR int, MONTH INT,
+DAY INT, DAY_OF_WEEK INT,AIRLINE VARCHAR(20),FLIGHT_NUMBER INT, TAIL_NUMBER VARCHAR(30),
+ORIGIN_AIRPORT VARCHAR(20), DESTINATION_AIRPORT 
+CREATE EXTERNAL TABLE IF NOT EXISTS flights_part(ID int, YEAR int, MONTH INT,
+DAY INT, DAY_OF_WEEK INT, AIRLINE VARCHAR(20),FLIGHT_NUMBER INT, TAIL_NUMBER VARCHAR(30),
+ORIGIN_AIRPORT VARCHAR(20), DESTINATION_AIRPORT VARCHAR(20), SCHEDULED_DEPARTURE INT,
+DEPARTURE_TIME INT,DEPARTURE_DELAY INT, TAXI_OUT INT, WHEELS_OFF INT,SCHEDULED_TIME INT,
+ELAPSED_TIME INT, AIR_TIME INT,DISTANCE INT, WHEELS_ON INT, TAXI_IN INT, SCHEDULED_ARRIVAL INT,
+ARRIVAL_TIME INT, ARRIVAL_DELAY INT,DIVERTED INT)
+partitioned by (CANCELLED INT)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY ','
+LINES TERMINATED BY '\n';
+STORED AS TEXTFILE
+LOCATION '/hive_flights';
+
+set hive.exec.dynamic.partition=true;
+set hive.exec.dynamic.partition.mode=nonstrict;
+
+CREATE EXTERNAL TABLE IF NOT EXISTS flights_part(ID int, YEAR int, MONTH INT,
+DAY INT, DAY_OF_WEEK INT, AIRLINE VARCHAR(20),FLIGHT_NUMBER INT, TAIL_NUMBER VARCHAR(30),
+ORIGIN_AIRPORT VARCHAR(20), DESTINATION_AIRPORT VARCHAR(20), SCHEDULED_DEPARTURE INT,
+DEPARTURE_TIME INT,DEPARTURE_DELAY INT, TAXI_OUT INT, WHEELS_OFF INT,SCHEDULED_TIME INT,
+ELAPSED_TIME INT, AIR_TIME INT,DISTANCE INT, WHEELS_ON INT, TAXI_IN INT, SCHEDULED_ARRIVAL INT,
+ARRIVAL_TIME INT, ARRIVAL_DELAY INT,DIVERTED INT)
+partitioned by (CANCELLED INT)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY ','
+LINES TERMINATED BY '\n';
+
+insert overwrite table flights_part
+partition(CANCELLED)
+select * from flights_data;
+
+select * from flights_part limit 5;
+
+
+
+--o.Create Bucketing table “Flights_Bucket” using clustered by MONTH into 3 Buckets Note: No partitioning, only bucketing of table.
+
+set hive.enforce.bucketing=true;
+
+CREATE EXTERNAL TABLE IF NOT EXISTS flights_buckets(ID int, YEAR int, MONTH INT,
+DAY INT, DAY_OF_WEEK INT, AIRLINE VARCHAR(20),FLIGHT_NUMBER INT, TAIL_NUMBER VARCHAR(30),
+ORIGIN_AIRPORT VARCHAR(20), DESTINATION_AIRPORT VARCHAR(20), SCHEDULED_DEPARTURE INT,
+DEPARTURE_TIME INT,DEPARTURE_DELAY INT, TAXI_OUT INT, WHEELS_OFF INT,SCHEDULED_TIME INT,
+ELAPSED_TIME INT, AIR_TIME INT,DISTANCE INT, WHEELS_ON INT, TAXI_IN INT, SCHEDULED_ARRIVAL INT,
+ARRIVAL_TIME INT, ARRIVAL_DELAY INT,DIVERTED INT,CANCELLED INT)
+clustered by (MONTH) into 3 buckets
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY ','
+LINES TERMINATED BY '\n';
+
+insert overwrite table flights_buckets
+select * from flights_data;
+
+select * from flights_buckets limit 5;
+
+
+--p.Get count of data of each bucket.
+
+-- 
+
+--q.Finding all diverted Route from a source to destination Airport & which route is the most diverted
+--select ORIGIN_AIRPORT, DESTINATION_AIRPORT , count(DIVERTED) from parquet_flights where DIVERTED=1 group by ORIGIN_AIRPORT, DESTINATION_AIRPORT;
+
+--r.Finding AIRLINES with its total flight count, total number of flights arrival delayed by more than 30 Minutes, % of such flights delayed by more than 30 minutes when it is not Weekends with minimum count of flights from Airlines by more than 10. Also Exclude some of Airlines 'AK', 'HI', 'PR', 'VI' and arrange output in descending order by % of such count of flights. 
+--select AIRLINES, count(FLIGHT_NUMBER) as flights_count, count(ARRIVAL_DELAY) as flight_arrival from parquet_flights where flight_aarival > 30
+
+--s.Finding AIRLINES with its total flight count with total number of flights departure delayed by less than 30 Minutes, % of such flights delayed by less than 30 minutes when it is Weekends with minimum count of flights from Airlines by more than 10. Also Exclude some of Airlines 'AK', 'HI', 'PR', 'VI' and arrange output in descending order by % of such count of flights. 
+
+--t.When is the best time of day/day of week/time of a year to fly with minimum delays?
+--
